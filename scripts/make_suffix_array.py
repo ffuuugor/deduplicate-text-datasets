@@ -17,26 +17,39 @@ import time
 import sys
 import multiprocessing as mp
 import numpy as np
+import argparse
 
-data_size = os.path.getsize(sys.argv[1])
+parser = argparse.ArgumentParser()
+parser.add_argument("--input-path", type=str)
+parser.add_argument("--tmp-path", type=str)
+parser.add_argument("--num-threads", type=int, default=80)
+parser.add_argument("--total-jobs-mult", type=int, default=1)
+args = parser.parse_args()
+
+input_path = args.input_path
+tmp_path = args.tmp_path
+
+data_size = os.path.getsize(input_path)
 
 HACK = 100000
 
 
 started = []
 
-if data_size > 10e9:
-    total_jobs = 100
-    jobs_at_once = 20
-elif data_size > 1e9:
-    total_jobs = 96
-    jobs_at_once = 96
-elif data_size > 10e6:
-    total_jobs = 4
-    jobs_at_once = 4
-else:
-    total_jobs = 1
-    jobs_at_once = 1
+jobs_at_once = args.num_threads
+total_jobs = jobs_at_once * args.total_jobs_mult
+# if data_size > 10e9:
+#     total_jobs = 100
+#     jobs_at_once = 20
+# elif data_size > 1e9:
+#     total_jobs = 96
+#     jobs_at_once = 96
+# elif data_size > 10e6:
+#     total_jobs = 4
+#     jobs_at_once = 4
+# else:
+#     total_jobs = 1
+#     jobs_at_once = 1
 
 S = data_size//total_jobs
 
@@ -45,7 +58,7 @@ for jobstart in range(0, total_jobs, jobs_at_once):
     wait = []
     for i in range(jobstart,jobstart+jobs_at_once):
         s, e = i*S, min((i+1)*S+HACK, data_size)
-        cmd = "./target/debug/dedup_dataset make-part --data-file %s --start-byte %d --end-byte %d"%(sys.argv[1], s, e)
+        cmd = "./target/debug/dedup_dataset make-part --data-file %s --start-byte %d --end-byte %d"%(input_path, s, e)
         started.append((s, e))
         print(cmd)
         wait.append(os.popen(cmd))
@@ -59,7 +72,7 @@ for jobstart in range(0, total_jobs, jobs_at_once):
 print("Checking all wrote correctly")
 
 while True:
-    files = ["%s.part.%d-%d"%(sys.argv[1],s, e) for s,e in started]
+    files = ["%s.part.%d-%d"%(input_path,s, e) for s,e in started]
     
     wait = []
     for x,(s,e) in zip(files,started):
@@ -74,7 +87,7 @@ while True:
             if not os.path.exists(x) or not os.path.exists(x+".table.bin") or os.path.getsize(x+".table.bin") == 0 or size_data*FACT != os.path.getsize(x+".table.bin"):
                 go = True
         if go:
-            cmd = "./target/debug/dedup_dataset make-part --data-file %s --start-byte %d --end-byte %d"%(sys.argv[1], s, e)
+            cmd = "./target/debug/dedup_dataset make-part --data-file %s --start-byte %d --end-byte %d"%(input_path, s, e)
             print(cmd)
             wait.append(os.popen(cmd))
             if len(wait) >= jobs_at_once:
@@ -88,26 +101,28 @@ while True:
 
 print("Merging suffix trees")
 
-os.popen("rm tmp/out.table.bin.*").read()
+os.popen("rm %s/out.table.bin.*" % tmp_path).read()
 
 torun = " --suffix-path ".join(files)
-print("./target/debug/dedup_dataset merge --output-file %s --suffix-path %s --num-threads %d"%("tmp/out.table.bin", torun, mp.cpu_count()))
-pipe = os.popen("./target/debug/dedup_dataset merge --output-file %s --suffix-path %s --num-threads %d"%("tmp/out.table.bin", torun, mp.cpu_count()))
-output = pipe.read()
-if pipe.close() is not None:
-    print("Something went wrong with merging.")
-    print("Please check that you ran with ulimit -Sn 100000")
-    exit(1)
-#exit(0)
-print("Now merging individual tables")
-os.popen("cat tmp/out.table.bin.* > tmp/out.table.bin").read()
-print("Cleaning up")
-os.popen("mv tmp/out.table.bin %s.table.bin"%sys.argv[1]).read()
+num_threads = args.num_threads
+print("./target/debug/dedup_dataset merge --output-file %s --suffix-path %s --num-threads %d"%(f"{tmp_path}/out.table.bin", torun, num_threads))
 
-if os.path.exists(sys.argv[1]+".table.bin"):
-    if os.path.getsize(sys.argv[1]+".table.bin")%os.path.getsize(sys.argv[1]) != 0:
-        print("File size is wrong")
-        exit(1)
-else:
-    print("Failed to create table")
-    exit(1)
+# pipe = os.popen("./target/debug/dedup_dataset merge --output-file %s --suffix-path %s --num-threads %d"%(f"{tmp_path}/out.table.bin", torun, num_threads))
+# output = pipe.read()
+# if pipe.close() is not None:
+#     print("Something went wrong with merging.")
+#     print("Please check that you ran with ulimit -Sn 100000")
+#     exit(1)
+# #exit(0)
+# print("Now merging individual tables")
+# os.popen("cat tmp/out.table.bin.* > tmp/out.table.bin").read()
+# print("Cleaning up")
+# os.popen("mv tmp/out.table.bin %s.table.bin"%input_path).read()
+
+# if os.path.exists(input_path+".table.bin"):
+#     if os.path.getsize(input_path+".table.bin")%os.path.getsize(input_path) != 0:
+#         print("File size is wrong")
+#         exit(1)
+# else:
+#     print("Failed to create table")
+#     exit(1)
