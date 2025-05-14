@@ -101,7 +101,7 @@ def sample_bucket(ds, source_positions, source_counts, n, target_count, target_t
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
-    parser = argparse.ArgumentParser(description="Scan dataset for near duplicates")
+    parser = argparse.ArgumentParser()
     parser.add_argument("--output-path", type=str, required=True)
     parser.add_argument("--positions-path", type=str, required=True)
     parser.add_argument("--counts-dir", type=str, required=True)

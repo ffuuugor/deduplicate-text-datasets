@@ -1,7 +1,6 @@
 import argparse
 import copy
 import logging
-import multiprocessing as mp
 import os
 import pickle
 from collections import Counter, defaultdict
@@ -11,9 +10,7 @@ from multiprocessing import shared_memory
 
 import numpy as np
 from tqdm import tqdm
-from utils import (Sequence, bytes_to_ints, edit_distance, hamming_distance,
-                   load_dataset, log_target_sequnces_stats, METRICS, merge_results, print_near_duplicate_summary)
-import traceback
+from utils import (bytes_to_ints, load_dataset, log_target_sequnces_stats, METRICS, merge_results, print_near_duplicate_summary)
 
 class CharCounter:
 
